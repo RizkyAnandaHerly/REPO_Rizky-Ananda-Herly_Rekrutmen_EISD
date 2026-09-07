@@ -65,9 +65,7 @@ class AuthController extends Controller
             'role' => 'resident', // Always resident — admin only via seeder
         ]);
 
-        Auth::login($user);
-
-        return redirect('/bookings')->with('success', 'Registrasi berhasil! Selamat datang di ResiCycle.');
+        return redirect('/login')->with('success', 'Registrasi berhasil! Silakan login.');
     }
 
     /**
@@ -79,6 +77,6 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login')->with('success', 'Anda berhasil logout.');
+        return redirect('/login')->with('warning', 'Anda telah logout dari sistem.');
     }
 }

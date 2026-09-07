@@ -103,6 +103,7 @@
         }
         .flash-error { background: rgba(231,111,81,0.1); color: #C0392B; border-left: 4px solid var(--rc-danger); }
         .flash-success { background: rgba(45,106,79,0.08); color: var(--rc-primary); border-left: 4px solid var(--rc-primary-lighter); }
+        .flash-warning { background: rgba(233,196,106,0.15); color: #B8860B; border-left: 4px solid #E9C46A; }
     </style>
 </head>
 <body>
@@ -119,6 +120,11 @@
             @if(session('success'))
                 <div class="flash-message flash-success">
                     <i class="bi bi-check-circle-fill me-1"></i> {{ session('success') }}
+                </div>
+            @endif
+            @if(session('warning'))
+                <div class="flash-message flash-warning">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i> {{ session('warning') }}
                 </div>
             @endif
 
