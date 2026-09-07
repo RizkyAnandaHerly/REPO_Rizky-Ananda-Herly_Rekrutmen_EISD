@@ -49,6 +49,7 @@
                             <th>Tanggal</th>
                             <th>Kategori</th>
                             <th>Status</th>
+                            <th>Antrian</th>
                             <th>Poin</th>
                             <th>Aksi</th>
                         </tr>
@@ -67,6 +68,19 @@
                                 <span class="badge-status badge-{{ $booking->status }}">
                                     {{ ucfirst($booking->status) }}
                                 </span>
+                            </td>
+                            <td>
+                                @if($booking->status === 'pending')
+                                    <span class="badge bg-light text-dark" style="font-size: 0.78rem;">
+                                        <i class="bi bi-people-fill me-1"></i>#{{ $booking->queue_number }}/{{ $booking->total_queue }}
+                                    </span>
+                                    <br>
+                                    <small class="text-muted" style="font-size: 0.72rem;">Sudah diproses: {{ $booking->current_served }}</small>
+                                @elseif($booking->status === 'verified' || $booking->status === 'rejected')
+                                    <span class="text-muted" style="font-size: 0.78rem;">#{{ $booking->queue_number }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
                             </td>
                             <td>
                                 @if($booking->status === 'verified')

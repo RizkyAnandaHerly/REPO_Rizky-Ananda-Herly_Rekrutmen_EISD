@@ -41,6 +41,12 @@
                 @error('scheduled_date')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
+
+                <!-- Queue Preview (AJAX) -->
+                <div id="queuePreview" class="mt-2 p-2 d-none" style="background: rgba(42,157,143,0.08); border-radius: 8px; border: 1px solid rgba(42,157,143,0.15); font-size: 0.85rem;">
+                    <i class="bi bi-people-fill me-1" style="color: #2A9D8F;"></i>
+                    <span id="queuePreviewText">Memuat info antrian...</span>
+                </div>
             </div>
 
             <!-- Waste Categories -->
@@ -168,6 +174,47 @@
         @if($errors->any())
             gsap.from('#validation-errors', { x: -10, duration: 0.1, repeat: 5, yoyo: true, ease: 'power2.inOut' });
         @endif
+
+        // ── AJAX Queue Preview ──
+        const dateInput = document.getElementById('scheduled_date');
+        const queuePreview = document.getElementById('queuePreview');
+        const queuePreviewText = document.getElementById('queuePreviewText');
+
+        function fetchQueueCount(date) {
+            if (!date) {
+                queuePreview.classList.add('d-none');
+                return;
+            }
+            queuePreviewText.textContent = 'Memuat info antrian...';
+            queuePreview.classList.remove('d-none');
+
+            fetch('/api/queue-count?date=' + encodeURIComponent(date), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.count === 0) {
+                    queuePreviewText.textContent = 'Belum ada setoran terdaftar di tanggal ini. Anda akan menjadi antrian #1!';
+                    queuePreview.style.background = 'rgba(42,157,143,0.08)';
+                } else if (data.count < 5) {
+                    queuePreviewText.textContent = 'Sudah ada ' + data.count + ' setoran terdaftar. Antrian Anda: #' + (data.count + 1);
+                    queuePreview.style.background = 'rgba(42,157,143,0.08)';
+                } else {
+                    queuePreviewText.textContent = 'Sudah ada ' + data.count + ' setoran terdaftar. Antrian Anda: #' + (data.count + 1) + ' — Tanggal ini cukup ramai!';
+                    queuePreview.style.background = 'rgba(233,196,106,0.12)';
+                }
+            })
+            .catch(() => {
+                queuePreviewText.textContent = 'Gagal memuat info antrian.';
+            });
+        }
+
+        dateInput.addEventListener('change', function() {
+            fetchQueueCount(this.value);
+        });
+
+        // Fetch on page load for default date
+        fetchQueueCount(dateInput.value);
     });
 </script>
 @endsection

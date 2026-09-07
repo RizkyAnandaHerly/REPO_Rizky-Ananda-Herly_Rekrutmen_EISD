@@ -3,19 +3,33 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DropoffBookingController;
 use App\Http\Controllers\WasteCategoryController;
+use App\Models\DropoffBooking;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ── Public Routes ──
 
 Route::get('/', function () {
-    return redirect('/login');
-});
+    if (auth()->check()) {
+        return auth()->user()->isAdmin()
+            ? redirect('/admin/bookings')
+            : redirect('/bookings');
+    }
+    return view('welcome');
+})->name('home');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
+
+// AJAX: Queue count for a specific date (route closure — no controller method needed)
+Route::get('/api/queue-count', function (Request $request) {
+    $request->validate(['date' => 'required|date']);
+    $count = DropoffBooking::countForDate($request->date);
+    return response()->json(['count' => $count]);
+})->middleware(['auth', 'role:resident']);
 
 // ── Resident Routes ──
 

@@ -126,16 +126,31 @@ class DropoffBookingController extends Controller
 
     /**
      * Display all bookings for admin (landing page after admin login).
+     * Supports tab filtering via ?view=history query param.
      */
-    public function adminIndex()
+    public function adminIndex(Request $request)
     {
-        $bookings = DropoffBooking::with('user')
-            ->latest()
-            ->get();
+        $view = $request->query('view', 'pending');
 
-        $pendingCount = $bookings->where('status', 'pending')->count();
+        if ($view === 'history') {
+            $bookings = DropoffBooking::with('user')
+                ->whereIn('status', ['verified', 'rejected', 'cancelled'])
+                ->latest('scheduled_date')
+                ->get();
+        } else {
+            // Default: pending only, sorted by nearest date first
+            $bookings = DropoffBooking::with('user')
+                ->where('status', 'pending')
+                ->orderBy('scheduled_date', 'asc')
+                ->get();
+        }
 
-        return view('admin.bookings.index', compact('bookings', 'pendingCount'));
+        $pendingCount = DropoffBooking::where('status', 'pending')->count();
+        $todayPendingCount = DropoffBooking::where('status', 'pending')
+            ->whereDate('scheduled_date', today())
+            ->count();
+
+        return view('admin.bookings.index', compact('bookings', 'pendingCount', 'todayPendingCount', 'view'));
     }
 
     /**

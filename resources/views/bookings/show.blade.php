@@ -42,6 +42,31 @@
             @endif
         </div>
 
+        <!-- Queue/Antrian Info -->
+        @if($booking->status !== 'cancelled')
+            <div class="p-3 mb-4" style="background: linear-gradient(135deg, rgba(38,70,83,0.06) 0%, rgba(42,157,143,0.06) 100%); border-radius: var(--rc-radius); border: 1px solid rgba(42,157,143,0.15);">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div>
+                        <i class="bi bi-people-fill" style="font-size: 1.5rem; color: #2A9D8F;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--rc-text-muted);">Nomor Antrian Anda</div>
+                        <div style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 700; color: #264653;">
+                            #{{ $booking->queue_number }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--rc-text-muted);">dari {{ $booking->total_queue }} setoran</span>
+                        </div>
+                    </div>
+                    @if($booking->status === 'pending')
+                        <div class="ms-auto text-end">
+                            <div style="font-size: 0.78rem; color: var(--rc-text-muted);">Sudah diproses</div>
+                            <div style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: #2A9D8F;">
+                                {{ $booking->current_served }} / {{ $booking->total_queue }}
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <hr style="border-color: rgba(45,106,79,0.1);">
 
         <!-- Waste Categories -->

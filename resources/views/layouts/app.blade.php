@@ -329,6 +329,12 @@
             border-left: 4px solid var(--rc-danger);
         }
 
+        .flash-warning {
+            background: linear-gradient(135deg, rgba(233, 196, 106, 0.1) 0%, rgba(244, 162, 97, 0.08) 100%);
+            color: #B8860B;
+            border-left: 4px solid #E9C46A;
+        }
+
         /* ── Page Container ── */
         .page-container {
             max-width: 1140px;
@@ -515,6 +521,14 @@
         <div class="container mt-3">
             <div class="flash-message flash-error gsap-fade" id="flash-error">
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ session('error') }}
+            </div>
+        </div>
+    @endif
+
+    @if(session('warning'))
+        <div class="container mt-3">
+            <div class="flash-message flash-warning gsap-fade" id="flash-warning">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>{{ session('warning') }}
             </div>
         </div>
     @endif
