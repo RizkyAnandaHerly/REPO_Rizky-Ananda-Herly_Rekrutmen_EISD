@@ -41,6 +41,14 @@ Route::middleware(['auth', 'role:resident'])->group(function () {
     Route::patch('/bookings/{booking}/cancel', [DropoffBookingController::class, 'cancel'])->name('bookings.cancel');
 });
 
+// AJAX: Admin pending count for notification badge (route closure — no controller method)
+Route::get('/api/admin/pending-count', function () {
+    $pending = DropoffBooking::where('status', 'pending')->count();
+    $today = DropoffBooking::where('status', 'pending')
+        ->whereDate('scheduled_date', today())->count();
+    return response()->json(['pending' => $pending, 'today' => $today]);
+})->middleware(['auth', 'role:admin']);
+
 // ── Admin Routes ──
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {

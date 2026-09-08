@@ -452,6 +452,7 @@
             }
         }
     </style>
+    @stack('styles')
 </head>
 <body>
     @auth
@@ -491,6 +492,12 @@
                         @endif
                     </ul>
                     <div class="d-flex align-items-center gap-3">
+                        @if(auth()->user()->isAdmin())
+                            <a href="{{ route('admin.bookings.index') }}" class="position-relative text-white-50 text-decoration-none" id="notifBell" title="Setoran menunggu verifikasi">
+                                <i class="bi bi-bell-fill" style="font-size: 1.15rem;"></i>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notifBadge" style="font-size: 0.6rem;">0</span>
+                            </a>
+                        @endif
                         <span class="text-white-50 d-none d-lg-inline" style="font-size: 0.85rem;">
                             <i class="bi bi-person-circle me-1"></i>
                             {{ auth()->user()->name }}
@@ -614,6 +621,49 @@
             });
         });
     </script>
+
+    <!-- Admin Notification Polling -->
+    @auth
+        @if(auth()->user()->isAdmin())
+            <script>
+                (function() {
+                    const badge = document.getElementById('notifBadge');
+                    const bell = document.getElementById('notifBell');
+                    if (!badge || !bell) return;
+
+                    let lastCount = -1;
+
+                    function fetchPendingCount() {
+                        fetch('/api/admin/pending-count', {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.pending > 0) {
+                                badge.textContent = data.pending;
+                                badge.classList.remove('d-none');
+                                // Blink animation if count increased
+                                if (lastCount !== -1 && data.pending > lastCount) {
+                                    gsap.fromTo(bell, { scale: 1 }, {
+                                        scale: 1.3, duration: 0.15, repeat: 3, yoyo: true, ease: 'power2.inOut'
+                                    });
+                                }
+                            } else {
+                                badge.classList.add('d-none');
+                            }
+                            lastCount = data.pending;
+                        })
+                        .catch(() => {});
+                    }
+
+                    // Initial fetch
+                    fetchPendingCount();
+                    // Poll every 30 seconds
+                    setInterval(fetchPendingCount, 30000);
+                })();
+            </script>
+        @endif
+    @endauth
 
     @yield('scripts')
 </body>
