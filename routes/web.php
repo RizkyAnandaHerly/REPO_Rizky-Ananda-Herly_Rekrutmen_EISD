@@ -24,6 +24,9 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
 
+// Community Eco-Impact Leaderboard (accessible by both resident and admin)
+Route::get('/leaderboard', [DropoffBookingController::class, 'leaderboard'])->name('leaderboard')->middleware('auth');
+
 // AJAX: Queue count for a specific date (route closure — no controller method needed)
 Route::get('/api/queue-count', function (Request $request) {
     $request->validate(['date' => 'required|date']);

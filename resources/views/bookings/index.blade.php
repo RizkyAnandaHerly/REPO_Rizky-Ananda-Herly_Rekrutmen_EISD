@@ -111,6 +111,18 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination Links -->
+            @if($bookings->hasPages())
+                <div class="p-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <small class="text-muted">
+                        Halaman {{ $bookings->currentPage() }} dari {{ $bookings->lastPage() }}
+                    </small>
+                    <div class="pagination-sm m-0">
+                        {{ $bookings->links('pagination::bootstrap-5') }}
+                    </div>
+                </div>
+            @endif
         @endif
     </div>
 </div>

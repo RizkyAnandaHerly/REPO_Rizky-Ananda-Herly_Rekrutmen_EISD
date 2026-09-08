@@ -478,6 +478,11 @@
                                     <i class="bi bi-plus-circle me-1"></i> Ajukan Setoran
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('leaderboard') ? 'active' : '' }}" href="{{ route('leaderboard') }}">
+                                    <i class="bi bi-trophy me-1"></i> Leaderboard
+                                </a>
+                            </li>
                         @else
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('admin.bookings.index') ? 'active' : '' }}" href="{{ route('admin.bookings.index') }}">
@@ -487,6 +492,11 @@
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('admin.waste-categories.*') ? 'active' : '' }}" href="{{ route('admin.waste-categories.index') }}">
                                     <i class="bi bi-tags me-1"></i> Kategori Sampah
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('leaderboard') ? 'active' : '' }}" href="{{ route('leaderboard') }}">
+                                    <i class="bi bi-trophy me-1"></i> Leaderboard
                                 </a>
                             </li>
                         @endif

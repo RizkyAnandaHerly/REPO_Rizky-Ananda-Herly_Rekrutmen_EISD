@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreBookingRequest;
 use App\Models\DropoffBooking;
+use App\Models\User;
 use App\Models\WasteCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,10 +21,10 @@ class DropoffBookingController extends Controller
 
         $bookings = DropoffBooking::where('user_id', $user->id)
             ->latest()
-            ->get();
+            ->paginate(5);
 
-        $pendingCount = $bookings->where('status', 'pending')->count();
-        $totalPoints = $bookings->where('status', 'verified')->sum('total_points');
+        $pendingCount = DropoffBooking::where('user_id', $user->id)->where('status', 'pending')->count();
+        $totalPoints = DropoffBooking::where('user_id', $user->id)->where('status', 'verified')->sum('total_points');
 
         return view('bookings.index', compact('bookings', 'pendingCount', 'totalPoints'));
     }
@@ -126,23 +127,53 @@ class DropoffBookingController extends Controller
 
     /**
      * Display all bookings for admin (landing page after admin login).
-     * Supports tab filtering via ?view=history query param.
+     * Supports tab filtering via ?view=history query param and server-side search/filter.
      */
     public function adminIndex(Request $request)
     {
         $view = $request->query('view', 'pending');
+        $search = $request->query('search');
+        $status = $request->query('status');
 
         if ($view === 'history') {
-            $bookings = DropoffBooking::with('user')
-                ->whereIn('status', ['verified', 'rejected', 'cancelled'])
-                ->latest('scheduled_date')
-                ->get();
+            $query = DropoffBooking::with('user', 'wasteCategories')
+                ->whereIn('status', ['verified', 'rejected', 'cancelled']);
+
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('booking_code', 'like', "%{$search}%")
+                        ->orWhereDate('scheduled_date', $search)
+                        ->orWhereHas('user', function ($uq) use ($search) {
+                            $uq->where('name', 'like', "%{$search}%");
+                        });
+                });
+            }
+
+            if ($status && in_array($status, ['verified', 'rejected', 'cancelled'])) {
+                $query->where('status', $status);
+            }
+
+            $bookings = $query->latest('scheduled_date')
+                ->paginate(5)
+                ->withQueryString();
         } else {
             // Default: pending only, sorted by nearest date first
-            $bookings = DropoffBooking::with('user')
-                ->where('status', 'pending')
-                ->orderBy('scheduled_date', 'asc')
-                ->get();
+            $query = DropoffBooking::with('user', 'wasteCategories')
+                ->where('status', 'pending');
+
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('booking_code', 'like', "%{$search}%")
+                        ->orWhereDate('scheduled_date', $search)
+                        ->orWhereHas('user', function ($uq) use ($search) {
+                            $uq->where('name', 'like', "%{$search}%");
+                        });
+                });
+            }
+
+            $bookings = $query->orderBy('scheduled_date', 'asc')
+                ->paginate(5)
+                ->withQueryString();
         }
 
         $pendingCount = DropoffBooking::where('status', 'pending')->count();
@@ -150,7 +181,7 @@ class DropoffBookingController extends Controller
             ->whereDate('scheduled_date', today())
             ->count();
 
-        return view('admin.bookings.index', compact('bookings', 'pendingCount', 'todayPendingCount', 'view'));
+        return view('admin.bookings.index', compact('bookings', 'pendingCount', 'todayPendingCount', 'view', 'search', 'status'));
     }
 
     /**
@@ -202,5 +233,133 @@ class DropoffBookingController extends Controller
         $booking->update(['status' => 'rejected']);
 
         return back()->with('success', 'Setoran ditolak.');
+    }
+
+    /**
+     * Display community eco-impact leaderboard (monthly, yearly, all-time, or archive).
+     */
+    public function leaderboard(Request $request)
+    {
+        $period = $request->query('period', 'current_month');
+        $selectedMonth = $request->filled('month') ? (int) $request->query('month') : null;
+        $selectedYear = $request->filled('year') ? (int) $request->query('year') : null;
+
+        $now = now();
+
+        if ($period === 'current_month') {
+            $selectedMonth = (int) $now->month;
+            $selectedYear = (int) $now->year;
+        } elseif ($period === 'current_year') {
+            $selectedMonth = null;
+            $selectedYear = (int) $now->year;
+        } elseif ($period === 'all_time') {
+            $selectedMonth = null;
+            $selectedYear = null;
+        } elseif ($period === 'archive') {
+            if (!$selectedMonth && !$selectedYear) {
+                $lastMonth = $now->copy()->subMonth();
+                $selectedMonth = (int) $lastMonth->month;
+                $selectedYear = (int) $lastMonth->year;
+            }
+        }
+
+        // Available periods for archive dropdown (from existing verified bookings)
+        $availableDates = DropoffBooking::where('status', 'verified')
+            ->pluck('scheduled_date')
+            ->map(function ($date) {
+                $c = \Carbon\Carbon::parse($date);
+                return [
+                    'year' => (int) $c->year,
+                    'month' => (int) $c->month,
+                    'label' => $c->locale('id')->translatedFormat('F Y'),
+                ];
+            })
+            ->unique(function ($item) {
+                return $item['year'] . '-' . $item['month'];
+            })
+            ->sortByDesc(function ($item) {
+                return $item['year'] * 100 + $item['month'];
+            })
+            ->values();
+
+        // Query active residents with verified bookings for the selected period
+        $users = User::where('role', 'resident')
+            ->withSum(['dropoffBookings' => function ($q) use ($selectedMonth, $selectedYear) {
+                $q->where('status', 'verified');
+                if ($selectedMonth) {
+                    $q->whereMonth('scheduled_date', $selectedMonth);
+                }
+                if ($selectedYear) {
+                    $q->whereYear('scheduled_date', $selectedYear);
+                }
+            }], 'total_points')
+            ->withCount(['dropoffBookings' => function ($q) use ($selectedMonth, $selectedYear) {
+                $q->where('status', 'verified');
+                if ($selectedMonth) {
+                    $q->whereMonth('scheduled_date', $selectedMonth);
+                }
+                if ($selectedYear) {
+                    $q->whereYear('scheduled_date', $selectedYear);
+                }
+            }])
+            ->get()
+            ->map(function ($u) {
+                $u->total_points = (int) ($u->dropoff_bookings_sum_total_points ?? 0);
+                $u->deposits_count = (int) ($u->dropoff_bookings_count ?? 0);
+                return $u;
+            })
+            ->filter(function ($u) {
+                return $u->total_points > 0;
+            })
+            ->sortByDesc('total_points')
+            ->values();
+
+        // Assign ranks (1, 2, 3...)
+        $rankedUsers = $users->map(function ($user, $index) {
+            $user->rank = $index + 1;
+            return $user;
+        });
+
+        $champion = $rankedUsers->first();
+        $topThree = $rankedUsers->take(3);
+        $remainingRanks = $rankedUsers->slice(3);
+
+        // Find current logged in user's position
+        $currentUser = Auth::user();
+        $myRank = null;
+        if ($currentUser && $currentUser->isResident()) {
+            $myRank = $rankedUsers->firstWhere('id', $currentUser->id);
+        }
+
+        // Summary stats for selected period
+        $totalCommunityPoints = $rankedUsers->sum('total_points');
+        $totalCommunityDeposits = $rankedUsers->sum('deposits_count');
+
+        // Period Label for Header display
+        if ($period === 'current_month') {
+            $periodTitle = 'Bulan Ini (' . $now->locale('id')->translatedFormat('F Y') . ')';
+        } elseif ($period === 'current_year') {
+            $periodTitle = 'Tahun Ini (' . $now->year . ')';
+        } elseif ($period === 'all_time') {
+            $periodTitle = 'Sepanjang Waktu (All-Time)';
+        } else {
+            $labelDate = \Carbon\Carbon::createFromDate($selectedYear ?? $now->year, $selectedMonth ?? $now->month, 1);
+            $periodTitle = 'Arsip: ' . $labelDate->locale('id')->translatedFormat('F Y');
+        }
+
+        return view('leaderboard.index', compact(
+            'rankedUsers',
+            'topThree',
+            'remainingRanks',
+            'champion',
+            'myRank',
+            'period',
+            'periodTitle',
+            'selectedMonth',
+            'selectedYear',
+            'availableDates',
+            'totalCommunityPoints',
+            'totalCommunityDeposits'
+        ));
     }
 }

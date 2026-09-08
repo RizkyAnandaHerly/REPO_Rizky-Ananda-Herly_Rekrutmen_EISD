@@ -43,41 +43,59 @@
             @else
                 <div class="col-sm-6 col-lg-4">
                     <div class="stat-card" style="border-left: 4px solid var(--rc-primary-lighter);">
-                        <div class="stat-value">{{ $bookings->count() }}</div>
+                        <div class="stat-value">{{ $bookings->total() }}</div>
                         <div class="stat-label"><i class="bi bi-archive me-1"></i> Total Riwayat</div>
                     </div>
                 </div>
             @endif
         </div>
         <!-- Filter Bar (History tab only) -->
-        @if($view === 'history' && !$bookings->isEmpty())
-            <div class="filter-bar card-rc p-3 mb-4">
+        @if($view === 'history')
+            <form method="GET" action="{{ route('admin.bookings.index') }}" class="filter-bar card-rc p-3 mb-4">
+                <input type="hidden" name="view" value="history">
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-8">
+                    <div class="col-md-7">
                         <label class="form-label form-label-rc mb-1">
                             <i class="bi bi-search me-1"></i> Cari
                         </label>
-                        <input type="text" id="filterSearch" class="form-control form-control-rc" placeholder="Ketik kode booking, nama warga, atau tanggal...">
+                        <input type="text" name="search" id="filterSearch" value="{{ request('search') }}"
+                            class="form-control form-control-rc" placeholder="Ketik kode booking, nama warga, atau tanggal (YYYY-MM-DD)...">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label form-label-rc mb-1">
                             <i class="bi bi-funnel me-1"></i> Status
                         </label>
-                        <select id="filterStatus" class="form-select form-select-rc">
+                        <select name="status" id="filterStatus" class="form-select form-select-rc" onchange="this.form.submit()">
                             <option value="">Semua Status</option>
-                            <option value="verified">Verified</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="cancelled">Cancelled</option>
+                            <option value="verified" {{ request('status') === 'verified' ? 'selected' : '' }}>Verified</option>
+                            <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                            <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
                         </select>
                     </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-rc w-100" style="padding: 0.6rem 0.5rem; font-size: 0.88rem;">
+                            <i class="bi bi-search me-1"></i> Cari
+                        </button>
+                    </div>
                 </div>
-                <div class="mt-2 d-flex justify-content-between align-items-center">
-                    <small class="text-muted" id="filterCount">Menampilkan {{ $bookings->count() }} data</small>
-                    <button type="button" id="filterReset" class="btn btn-sm btn-outline-rc" style="font-size: 0.78rem; padding: 0.25rem 0.75rem;">
-                        <i class="bi bi-x-circle me-1"></i> Reset
-                    </button>
+                <div class="mt-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <small class="text-muted" id="filterCount">
+                        @if($bookings->total() > 0)
+                            Menampilkan {{ $bookings->firstItem() }} - {{ $bookings->lastItem() }} dari {{ $bookings->total() }} data
+                        @else
+                            Menampilkan 0 data
+                        @endif
+                        @if(request('search') || request('status'))
+                            <span class="badge bg-primary bg-opacity-10 text-primary ms-1">Filter Aktif</span>
+                        @endif
+                    </small>
+                    @if(request('search') || request('status'))
+                        <a href="{{ route('admin.bookings.index', ['view' => 'history']) }}" class="btn btn-sm btn-outline-rc" style="font-size: 0.78rem; padding: 0.25rem 0.75rem;">
+                            <i class="bi bi-x-circle me-1"></i> Reset Filter
+                        </a>
+                    @endif
                 </div>
-            </div>
+            </form>
         @endif
 
         <!-- Bookings Table -->
@@ -167,6 +185,18 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Links -->
+                @if($bookings->hasPages())
+                    <div class="p-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <small class="text-muted">
+                            Halaman {{ $bookings->currentPage() }} dari {{ $bookings->lastPage() }}
+                        </small>
+                        <div class="pagination-sm m-0">
+                            {{ $bookings->links('pagination::bootstrap-5') }}
+                        </div>
+                    </div>
+                @endif
             @endif
         </div>
     </div>
@@ -220,84 +250,18 @@
                 padding: 0.55rem 0.85rem;
             }
 
-            tr.filter-hidden {
-                display: none !important;
+            .pagination .page-link {
+                color: var(--rc-primary);
+                border-color: rgba(45, 106, 79, 0.15);
+                font-size: 0.85rem;
+                padding: 0.35rem 0.75rem;
             }
 
-            .no-results-row td {
-                text-align: center;
-                padding: 2rem !important;
-                color: var(--rc-text-muted);
-                font-size: 0.9rem;
+            .pagination .page-item.active .page-link {
+                background-color: var(--rc-primary);
+                border-color: var(--rc-primary);
+                color: #fff;
             }
         </style>
     @endpush
-@endsection
-
-@section('scripts')
-@if($view === 'history' && !$bookings->isEmpty())
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('filterSearch');
-        const statusSelect = document.getElementById('filterStatus');
-        const resetBtn = document.getElementById('filterReset');
-        const filterCount = document.getElementById('filterCount');
-        const tbody = document.querySelector('.table-rc tbody');
-        const rows = tbody.querySelectorAll('tr:not(.no-results-row)');
-        const totalCount = rows.length;
-
-        function applyFilters() {
-            const searchTerm = searchInput.value.toLowerCase().trim();
-            const statusTerm = statusSelect.value.toLowerCase();
-            let visibleCount = 0;
-
-            // Remove existing no-results row
-            const existingNoResults = tbody.querySelector('.no-results-row');
-            if (existingNoResults) existingNoResults.remove();
-
-            rows.forEach(function(row) {
-                const code = (row.cells[0] ? row.cells[0].textContent : '').toLowerCase();
-                const name = (row.cells[1] ? row.cells[1].textContent : '').toLowerCase();
-                const date = (row.cells[2] ? row.cells[2].textContent : '').toLowerCase();
-                const status = (row.cells[4] ? row.cells[4].textContent.trim() : '').toLowerCase();
-
-                const matchesSearch = !searchTerm ||
-                    code.includes(searchTerm) ||
-                    name.includes(searchTerm) ||
-                    date.includes(searchTerm);
-
-                const matchesStatus = !statusTerm || status === statusTerm;
-
-                if (matchesSearch && matchesStatus) {
-                    row.classList.remove('filter-hidden');
-                    visibleCount++;
-                } else {
-                    row.classList.add('filter-hidden');
-                }
-            });
-
-            filterCount.textContent = 'Menampilkan ' + visibleCount + ' dari ' + totalCount + ' data';
-
-            // Show "no results" message
-            if (visibleCount === 0) {
-                const noRow = document.createElement('tr');
-                noRow.className = 'no-results-row';
-                noRow.innerHTML = '<td colspan="7"><i class="bi bi-search me-1"></i> Tidak ada data yang cocok dengan filter.</td>';
-                tbody.appendChild(noRow);
-            }
-        }
-
-        searchInput.addEventListener('input', applyFilters);
-        statusSelect.addEventListener('change', applyFilters);
-
-        resetBtn.addEventListener('click', function() {
-            searchInput.value = '';
-            statusSelect.value = '';
-            applyFilters();
-            // Focus back on search
-            searchInput.focus();
-        });
-    });
-</script>
-@endif
 @endsection
